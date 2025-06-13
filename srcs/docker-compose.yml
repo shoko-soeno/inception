@@ -1,0 +1,48 @@
+# the version of the Docker Compose file is 3.8 which is compatible with Docker Engine 19.03.0 and above.
+version: '3.8'
+
+
+services:
+  mariadb: # the service name for the MariaDB container
+    build: ./mariadb # Dockerfileの場所
+    container_name: mariadb
+    image: mariadb:latest # 使用するMariaDBの最新イメージ ftに変える必要がある？
+    restart: always # always restart the container if it stops
+    env_file: .env
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql # コンテナ内の特定ディレクトリをホストマシンと共有
+    networks:
+      - inception #コンテナ同士が通信できるようにする仮想ネットワーク
+
+  wordpress:
+    build: ./wordpress
+    container_name: wordpress
+    depends_on:
+      - mariadb
+    restart: always
+    env_file: .env
+    environment:
+      - WORDPRESS_DB_HOST=mariadb:3306 # MariaDBのホスト名とポート番号(MySQL/MariaDBの標準ポート)
+      - WORDPRESS_DB_NAME=${MYSQL_DATABASE}
+      - WORDPRESS_DB_USER=${MYSQL_USER}
+      - WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - wordpress_data:/var/www/html
+    ports:
+      - "8080:80"  # 後でNGINXに置き換え
+    networks:
+      - inception 
+
+volumes: # 永続ボリュームの名前定義。コンテナが削除されてもデータが保持される。
+  mariadb_data:
+  wordpress_data:
+
+# Docker の bridge ドライバを使って、同じネットワーク内のコンテナ同士が名前で通信できるようにする
+networks:
+  inception:
+    driver: bridge
