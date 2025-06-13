@@ -1,42 +1,67 @@
 # the version of the Docker Compose file is 3.8 which is compatible with Docker Engine 19.03.0 and above.
 version: '3.8'
 
-
 services:
+  nginx: # NGINXのサービス定義
+    build: ./requirements/nginx
+    container_name: nginx
+    image: nginx:latest # 使用するNGINXの最新イメージ nginx:ftに変える必要がある？
+    depends_on:
+      - wordpress
+    restart: always
+    ports:
+      - "127.0.0.1:443:443" # SSL通信のためのポート
+    volumes:
+      - wp-data:/var/www/html:ro # WordPressのデータをNGINXコンテナで参照できるようにする
+      - ./requirements/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./requirements/nginx/
+    networks:
+      - inception
+
   mariadb: # the service name for the MariaDB container
-    build: ./mariadb # Dockerfileの場所
+    build: ./requirements/mariadb # Dockerfileの場所
     container_name: mariadb
     image: mariadb:latest # 使用するMariaDBの最新イメージ ftに変える必要がある？
     restart: always # always restart the container if it stops
     env_file: .env
     environment: # .envファイルから環境変数を読み込むようにすることで、秘密情報や重要な設定値をソースコードから分離する
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - DB_USER
+      - DB_PASSWORD
+      - DB_DATABASE
     volumes:
       - mariadb_data:/var/lib/mysql # コンテナ内の特定ディレクトリをホストマシンと共有
+      # /home/login/data/mariadb
     networks:
       - inception #コンテナ同士が通信できるようにする仮想ネットワーク
 
   wordpress:
-    build: ./wordpress
+    build: ./requirements/wordpress
     container_name: wordpress
+    image: wordpress:latest # 使用するWordPressの最新イメージ ftに変える必要がある？
     depends_on:
       - mariadb
     restart: always
     env_file: .env
     environment:
-      - WORDPRESS_DB_HOST=mariadb:3306 # MariaDBのホスト名とポート番号(MySQL/MariaDBの標準ポート)
-      - WORDPRESS_DB_NAME=${MYSQL_DATABASE}
-      - WORDPRESS_DB_USER=${MYSQL_USER}
-      - WORDPRESS_DB_PASSWORD=${MYSQL_PASSWORD}
+      - WP_DB_HOST
+      - WP_DB_USER
+      - WP_DB_PASSWORD
+      - WP_DB_NAME
+      - WP_URL
+      - WP_ADMIN_USER
+      - WP_ADMIN_PASSWORD
+      - WP_EDITOR_USER
+      - WP_EDITOR_PASSWORD
     volumes:
       - wordpress_data:/var/www/html
+      # /home/login/data/wordpress
     ports:
       - "8080:80"  # 後でNGINXに置き換え
     networks:
       - inception 
+
+
+# 永続ボリュームの定義。コンテナが削除されてもデータが保持される。
 
 volumes: # 永続ボリュームの名前定義。コンテナが削除されてもデータが保持される。
   mariadb_data:
@@ -51,3 +76,8 @@ volumes: # 永続ボリュームの名前定義。コンテナが削除されて
 networks:
   inception:
     driver: bridge
+
+
+# ENTRYPOINT にはexecを使用。 tail -f / sleep infinity 使用禁止
+# 無限ループやバックグラウンド起動 (nginx & bash) 禁止
+# PID 1 で正しいプロセスが起動しているか

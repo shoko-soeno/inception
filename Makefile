@@ -1,11 +1,15 @@
 # A Makefile must set up your entire application 
 # (i.e., it has to build the Docker images using docker-compose.yml).
-
-NAME = inception
 COMPOSE_FILE = srcs/docker-compose.yml
 
 # .env is used to set environment variables for the docker-compose command.
 ENV_FILE = srcs/.env
+
+start:
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) up -d
+
+stop:
+	docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE) stop
 
 # -f: specifies the Compose file to use.
 # -d: detached mode, which runs containers in the background.
