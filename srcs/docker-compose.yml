@@ -9,7 +9,7 @@ services:
     image: mariadb:latest # 使用するMariaDBの最新イメージ ftに変える必要がある？
     restart: always # always restart the container if it stops
     env_file: .env
-    environment:
+    environment: # .envファイルから環境変数を読み込むようにすることで、秘密情報や重要な設定値をソースコードから分離する
       - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
@@ -41,6 +41,11 @@ services:
 volumes: # 永続ボリュームの名前定義。コンテナが削除されてもデータが保持される。
   mariadb_data:
   wordpress_data:
+# 保存したいデータ例
+# 　mariadb　：テーブルやレコードなど
+# 　wordpress：テーマ、プラグイン、アップロードされた画像など
+# 　NGINX　  ：SSL証明書など
+
 
 # Docker の bridge ドライバを使って、同じネットワーク内のコンテナ同士が名前で通信できるようにする
 networks:

@@ -1,3 +1,9 @@
+# DockerイメージのベースになるOSを指定する
+# MariaDB（データベース本体）をインストールする
+# 設定ファイルを MariaDBの設定フォルダにコピーする
+# DBを初期化するためのスクリプトをコンテナ内にコピーする
+# MariaDBコンテナが起動時に、スクリプトを実行 する
+
 # ベースイメージ　軽量なlinuxディストリビューション
 FROM alpine:3.18
 
@@ -19,7 +25,7 @@ COPY ./conf/my.cnf /etc/my.cnf
 
 # 自作の起動スクリプト
 COPY ./tools/init.sh /init.sh
-RUN chmod +x /init.sh
+RUN chmod +x /init.sh 
 
 # デフォルトの接続ポート3306を公開
 EXPOSE 3306
