@@ -1,6 +1,63 @@
+#!/bin/bash
+
+# エラー発生時に即終了させる
+set -ex
+
+chown -R www-data:www-data /var/www/html
+
+# MariaDBコンテナが起動完了するまで待機させる
+echo "[+] Waiting for MariaDB..."
+while ! mysqladmin ping -h "$WORDPRESS_DB_HOST" --silent; do
+    sleep 2
+done
+
+# wp-config.phpがまだ存在しない場合のみ初期設定を行う
+if [ ! -f /var/www/html/wp-config.php ]; then
+    echo "[+] Starting WordPress setup..."
+    # WordPress作業ディレクトリに移動
+    cd /var/www/html
+    
+    # WordPressをダウンロード
+    echo "[+] Downloading WordPress..."
+    wp core download --path=/var/www/html --locale=ja --allow-root
+    
+    # wp-config.phpを環境変数に基づいて自動生成する
+    echo "[+] Creating wp-config.php..."
+    wp config create \
+        --dbname="$MYSQL_DATABASE" \
+        --dbuser="$MYSQL_USER" \
+        --dbpass="$MYSQL_PASSWORD" \
+        --dbhost="$WORDPRESS_DB_HOST" \
+        --allow-root \
+        --skip-check || { echo "[!] Config creation failed"; exit 1; }
+
+    # サイト情報と管理者ユーザーを自動設定する
+    echo "[+] Installing WordPress core..."
+    wp core install \
+        --url="$DOMAIN" \
+        --title="$WORDPRESS_SITE_TITLE" \
+        --admin_user="$WORDPRESS_ADMIN_USER" \
+        --admin_password="$WORDPRESS_ADMIN_PASSWORD" \
+        --admin_email="$WORDPRESS_ADMIN_EMAIL" \
+        --skip-email \
+        --allow-root || { echo "[!] Core install failed"; exit 1; }
+
+    # 編集者ロールの一般ユーザーを追加する
+    echo "[+] Creating editor user..."
+    wp user create \
+        "${WORDPRESS_EDITOR_USER}" \
+        "${WORDPRESS_EDITOR_EMAIL}" \
+        --user_pass="${WORDPRESS_EDITOR_PASSWORD}" \
+        --role=editor \
+        --allow-root || { echo "[!] Editor user creation failed"; exit 1; }
+
+    # ここで一応所有権をwww-dataに再設定しておく(NginxやPHP-FPMの実行ユーザーのため)
+    echo "[+] Setup complete. Fixing permissions..."
+    chown -R www-data:www-data /var/www/html
+fi
+
 # WordPressのセットアップ＆ユーザー作成
 # MariaDB が起動するまで待つ ※コンテナではなく、DBの準備が整うまで待つ
-
 # WordPress の設定ファイルがない場合（初回起動時）のみ、以下を実行
 # WordPress をインストールする
 # WordPress の設定ファイル（DBとの接続設定など）を作成
@@ -8,68 +65,6 @@
 # 一般ユーザー（投稿者）を作成
 # PHP-FPM を起動する
 
-#!/bin/bash
-set -ex
-
-# WordPressの初期設定
-if [ ! -f /var/www/html/wp-config.php ]; then
-    echo "WordPressの初期設定を行います。"
-    # WordPressをダウンロード
-    wget https://wordpress.org/latest.tar.gz -O /tmp/wordpress.tar.gz
-    tar -xzf /tmp/wordpress.tar.gz -C /var/www/html --strip-components=1
-    rm /tmp/wordpress.tar.gz
-
-    # WordPressの設定ファイルを作成
-    cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
-
-    # DB接続設定を更新
-    sed -i "s/database_name_here/${WORDPRESS_DB_NAME}/" /var/www/html/wp-config.php
-    sed -i "s/username_here/${WORDPRESS_DB_USER}/" /var/www/html/wp-config.php
-    sed -i "s/password_here/${WORDPRESS_DB_PASSWORD}/" /var/www/html/wp-config.php
-    sed -i "s/localhost/${WORDPRESS_DB_HOST}/" /var/www/html/wp-config.php
-
-    # セキュリティキーを生成して設定ファイルに追加
-    curl -s https://api.wordpress.org/secret-key/1.1/salt/ >> /var/www/html/wp-config.php
-
-    # ディレクトリの権限を設定
-    chown -R www-data:www-data /var/www/html
-else
-    echo "WordPressはすでに初期化されています。"
-fi
-
-
-# PHP-FPMの設定ファイルを更新
-echo "PHP-FPMの設定ファイルを更新します。"
-cat <<EOF > /etc/php/7.4/fpm/pool.d/www.conf
-[www]
-user = www-data
-group = www-data
-listen = /var/run/php/php7.4-fpm.sock
-listen.owner = www-data
-listen.group = www-data
-listen.mode = 0660
-pm = dynamic
-pm.max_children = 5
-pm.start_servers = 2
-pm.min_spare_servers = 1
-pm.max_spare_servers = 3
-pm.max_requests = 500
-php_admin_value[error_log] = /var/log/php-fpm/www-error.log
-php_admin_flag[log_errors] = on
-php_value[session.save_path] = /var/lib/php/sessions
-php_value[upload_tmp_dir] = /var/lib/php/uploads
-php_value[date.timezone] = UTC
-php_value[display_errors] = Off
-php_value[display_startup_errors] = Off
-php_value[log_errors] = On
-php_value[error_reporting] = E_ALL & ~E_DEPRECATED & ~E_STRICT
-php_value[session.cookie_httponly] = 1
-php_value[session.cookie_secure] = 1
-php_value[session.use_strict_mode] = 1
-php_value[session.use_only_cookies] = 1
-php_value[session.cookie_samesite] = Strict
-php_value[session.gc_maxlifetime] = 1440
-php_value[session.save_handler] = files
-php_value[session.serialize_handler] = php
-php_admin_value[upload_max_filesize] = 64M
-php_admin_value[post_max_size] = 64M            
+# PHP-FPMを実行する(フォアグラウンド)
+echo "[+] Starting PHP-FPM..."
+exec php-fpm7.4 -F

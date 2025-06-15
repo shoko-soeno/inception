@@ -1,19 +1,23 @@
-# 秘密鍵（SSL通信を暗号化するためのもの）を作成
-# 証明書署名リクエストを作成
-# 自己署名証明書を作成
-# Nginxをデーモンモードではなくフォアグラウンドで起動
-# ※コンテナが終了しないようにする
+#!/bin/bash
 
-#!/bin/sh
+# エラー発生時に即終了させる
 set -ex
 
-# Create certificate
-if [ ! -e /etc/ssl/private/inception.key ]; then
-  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -subj "/C=JP/ST=Tokyo/L=Tokyo/O=42Tokyo/OU=42Tokyo/CN=inception" \
-    -keyout /etc/ssl/private/inception.key \
-    -out /etc/ssl/certs/inception.crt
-fi
+# SSL証明書の保存先移動
+cd /etc/nginx/ssl
 
-# Start nginx
-exec nginx -g "daemon off;"
+# 秘密鍵作成(NISTなどのセキュリティ機関が2048bit以上を推奨しており、パフォーマンスバランスがいいためこちらを指定)
+openssl genrsa -out inception.key 2048
+# CSR(証明書署名要求リクエスト)作成
+openssl req -new -key inception.key -out inception.csr -subj "/C=JP/ST=Tokyo/L=Shinjuku/O=42Tokyo/CN=ssoeno.42.fr"
+# CSRから自己署名証明書を作成
+openssl x509 -req -days 365 -in inception.csr -signkey inception.key -out inception.crt
+# # Create certificate
+# if [ ! -f inception.key ] || [ ! -f inception.crt ]; then
+#     openssl genrsa -out inception.key 2048
+#     openssl req -new -key inception.key -out inception.csr -subj "/C=JP/ST=Tokyo/L=Shinjuku/O=42Tokyo/CN=ssoeno.42.fr"
+#     openssl x509 -req -days 365 -in inception.csr -signkey inception.key -out inception.crt
+# fi
+
+# Nginxをデーモンモードではなくフォアグラウンドで起動　※コンテナが終了しないようにする
+exec nginx -g 'daemon off;'
