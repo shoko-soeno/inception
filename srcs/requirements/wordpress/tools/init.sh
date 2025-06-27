@@ -5,11 +5,11 @@ set -ex
 
 chown -R www-data:www-data /var/www/html
 
-# MariaDBコンテナが起動完了するまで待機させる
-echo "[+] Waiting for MariaDB..."
-while ! mysqladmin ping -h "$WORDPRESS_DB_HOST" --silent; do
-    sleep 2
-done
+# MariaDBコンテナが起動完了するまで待機 -> use Docker's built-in health check mechanism instead
+# echo "[+] Waiting for MariaDB..."
+# while ! mysqladmin ping -h "$WORDPRESS_DB_HOST" --silent; do
+#     sleep 2
+# done
 
 # wp-config.phpがまだ存在しない場合のみ初期設定を行う
 if [ ! -f /var/www/html/wp-config.php ]; then

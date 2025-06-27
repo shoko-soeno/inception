@@ -2,17 +2,19 @@
 # version: '3.8'
 
 services:
-  nginx: # NGINXのサービス定義
+  nginx:
+    # NGINXのサービス定義
     container_name: nginx
     build:
       context: ./requirements/nginx # Dockerfileの場所
       dockerfile: Dockerfile # Dockerfileの名前
+    image: nginx:ft_inception # イメージ名
     depends_on:
       - wordpress
     restart: always
     ports:
       - "443:443" # SSL通信のためのポート
-      - "8080:80" # HTTP通信のためのポート
+      # - "8080:80" # HTTP通信のためのポート
 
     volumes:
       - wp_data:/var/www/html # WordPressのデータをNGINXコンテナで参照できるようにする
@@ -21,27 +23,38 @@ services:
     networks:
       - inception
 
-  wordpress: # WordPressのサービス定義
+  wordpress:
+    # WordPressのサービス定義
     build: ./requirements/wordpress # Dockerfileの場所
+    image: wordpress:ft_inception # イメージ名
     container_name: wordpress
     env_file:
       - .env
     restart: always
     depends_on:
-      - mariadb
+      mariadb:
+        condition: service_healthy # MariaDBが起動してからWordPressを起動する
     volumes:
       - wp_data:/var/www/html
     networks:
       - inception
 
-  mariadb: # MariaDBのサービス定義
+  mariadb:
+    # MariaDBのサービス定義
     container_name: mariadb
     build:
       context: ./requirements/mariadb # Dockerfileの場所
       dockerfile: Dockerfile
+    image: mariadb:ft_inception # イメージ名
     env_file:
       - .env
     restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
     volumes:
       - db_data:/var/lib/mysql # WordPressのデータをMariaDBコンテナで参照できるようにする
     networks:
@@ -72,6 +85,7 @@ volumes:
 
 networks:
   inception:
+    name: user_defined_network
     driver: bridge
 
 # ENTRYPOINT にはexecを使用。 tail -f / sleep infinity 使用禁止
