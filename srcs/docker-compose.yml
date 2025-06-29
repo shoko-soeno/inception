@@ -14,7 +14,6 @@ services:
     restart: always
     ports:
       - "443:443" # SSL通信のためのポート
-      # - "8080:80" # HTTP通信のためのポート
 
     volumes:
       - wp_data:/var/www/html # WordPressのデータをNGINXコンテナで参照できるようにする
