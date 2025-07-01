@@ -86,7 +86,3 @@ networks:
   inception:
     name: user_defined_network
     driver: bridge
-
-# ENTRYPOINT にはexecを使用。 tail -f / sleep infinity 使用禁止
-# 無限ループやバックグラウンド起動 (nginx & bash) 禁止
-# PID 1 で正しいプロセスが起動しているか
